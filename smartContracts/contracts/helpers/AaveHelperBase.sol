@@ -1,7 +1,7 @@
 //SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
 
-import { AavePoolProviderInterface, AaveDataProviderInterface } from "../interfaces/aave/AaveInterface.sol";
+import { AavePoolProviderInterface, AaveDataProviderInterface, IAToken, IDToken } from "../interfaces/aave/AaveInterface.sol";
 
 abstract contract AaveHelperBase {
 	/**
@@ -12,6 +12,10 @@ abstract contract AaveHelperBase {
 		
 	AaveDataProviderInterface internal constant aaveData =
 		AaveDataProviderInterface(0x2d8A3C5677189723C4cB8873CfC9C8976FDF38Ac);
+
+	IAToken internal constant aTokenSupply = IAToken(0x99CBC45ea5bb7eF3a5BC08FB1B7E56bB2442Ef0D);
+
+	IDToken internal constant dTokenDebt = IDToken(0x24e6e0795b3c7c71D965fCc4f371803d1c1DcA1E); 
 
 	/**
 	 * @dev Get total collateral balance for an asset
