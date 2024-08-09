@@ -1,4 +1,5 @@
 require("@nomicfoundation/hardhat-toolbox");
+require("dotenv").config()
 
 /** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
@@ -23,5 +24,11 @@ module.exports = {
         }
       }
     ]
+  },
+  networks: {
+    tenderly :{
+      url: `https://virtual.base.rpc.tenderly.co/${process.env.TENDERLY_VIRTUAL_TESTNET}`,
+      accounts: [process.env.PRIVATE_KEY]
+    }
   }
 };

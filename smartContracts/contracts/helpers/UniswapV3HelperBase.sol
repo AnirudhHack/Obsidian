@@ -14,8 +14,8 @@ abstract contract UniswapV3HelperBase {
 
 
 	struct SellInfo {
-		address buyAddr; //token to be bought
 		address sellAddr; //token to be sold
+		address buyAddr; //token to be bought
 		uint24 fee; //pool fees for buyAddr-sellAddr token pair
 		uint256 slippageAmt; //slippage.
 		uint256 sellAmt; //amount of token to be bought

@@ -7,13 +7,14 @@ import "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 // import { IERC4626 } from "./interfaces/IERC4626.sol";
 import { SafeTransferLib } from "@rari-capital/solmate/src/utils/SafeTransferLib.sol";
-import "./interfaces/aave/FlashLoanReceiverBase.sol";
 import "./interfaces/IWETH9.sol";
 import "./helpers/AaveHelperBase.sol";
 import { AaveInterface, IAaveV3Oracle } from "./interfaces/aave/AaveInterface.sol";
 import "./helpers/UniswapV3HelperBase.sol";
+import {FlashLoanSimpleReceiverBase} from  "@aave/core-v3/contracts/flashloan/base/FlashLoanSimpleReceiverBase.sol";
+import {IPoolAddressesProvider} from  "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 
-contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard, AaveHelperBase, UniswapV3HelperBase{
+contract WSTETHVault is FlashLoanSimpleReceiverBase, ERC20, IERC4626, ReentrancyGuard, AaveHelperBase, UniswapV3HelperBase{
     using SafeTransferLib for ERC20;
 
     address public immutable asset;
@@ -21,7 +22,7 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
     address public governance;
     address public pendingGovernance;
     uint public slippage;
-    uint24 public fee;
+    uint24 public fee = 100;
 
     event PendingGovernance(address indexed governance);
     event GovernanceAccepted(address indexed newGovernance);
@@ -30,15 +31,14 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
 	 * @dev constructor
 	 * @notice Intializes state variables of vault.
 	 * @param _asset The address of the token to be supplied.
-	 * @param _addressProvider address of aaveV2 LendingPoolAddressesProvider
 	 * @param _weth9 address of WETH9
 	 */
     constructor(
         address _asset,
-        ILendingPoolAddressesProvider _addressProvider,
+        address _addressProvider,
         address _weth9,
         uint _slippage
-    ) ERC20("wstETHVault", "wstETHV") FlashLoanReceiverBase(_addressProvider) {
+    ) ERC20("wstETHVault", "wstETHV") FlashLoanSimpleReceiverBase(IPoolAddressesProvider(_addressProvider)) {
         asset = _asset;
         governance = msg.sender;
         WETH9 = IWETH9(_weth9);
@@ -82,6 +82,15 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
         emit Deposit(msg.sender, receiver, returnAmount, shares);
     }
 
+    function executeOperation(
+        address asset,
+        uint256 amount,
+        uint256 premium,
+        address initiator,
+        bytes calldata params
+    ) external override returns (bool) {
+
+    }
 
     /**
 	 * @dev withdraw
@@ -116,6 +125,7 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
             slippageAmt,
             assets
         ));
+        WETH9.transfer(receiver, returnAmount);
 
         emit Withdraw(msg.sender, receiver, owner, assets, shares);
     }
@@ -135,6 +145,29 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
         return slippageAmount;
     }
 
+    // /**
+	//  * @dev triggerFlashLoan
+	//  * @notice triggerFlashLoan function triggers aave flashloan in order to perform any opration like open position, Close position, deleverage, leverage.
+	//  * @param operation operation from enum operation
+	//  * @param amount amount
+	//  * @param _data1 data require for swap (dev : data is received from 1inch api by calling it offchain).
+	//  * @param _receiver receiver
+	//  */
+    function triggerFlashLoan()private {
+
+        address asset;
+        uint256 amount;
+        bytes memory params;
+        uint16 referralCode;
+
+        AaveInterface(aaveProvider.getPool()).flashLoanSimple(
+            address(this),
+            asset,
+            amount,
+            params,
+            0
+        );
+    }
     
     function totalAssets() public view override returns (uint256){
         uint amount = getVaultsActualBalance();
@@ -215,8 +248,6 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
         amount = supplyBal - borrowBal;
     }
 
-
-
     /**
      * @notice `setGovernance()` should be called by the existing governance address prior to calling this function.
      */
@@ -236,13 +267,13 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
         emit GovernanceAccepted(governance);
     }
 
-    function getAssetPriceFromAave(address asset)private view returns(uint price, uint decimals){
+    function getAssetPriceFromAave(address asset)public view returns(uint price, uint decimals){
         address priceOracleAddress = aaveProvider.getPriceOracle();
         price = IAaveV3Oracle(priceOracleAddress).getAssetPrice(asset);
         decimals = IAaveV3Oracle(priceOracleAddress).BASE_CURRENCY_UNIT();
     }
 
-    function getCollateralAssetBalance()public view returns(uint balanceUSD){
+    function getCollateralAssetBalance()public view returns(uint){ //usd
         (uint price, uint decimals) = getAssetPriceFromAave(asset);
         uint SupplyBalance = aTokenSupply.balanceOf(address(this));
         uint idleBalance = ERC20(asset).balanceOf(address(this));
@@ -250,6 +281,7 @@ contract WSTETHVault is FlashLoanReceiverBase, ERC20, IERC4626, ReentrancyGuard,
         if(totalBal <= 0) return 0;
 
         uint balanceUSD = (totalBal * price) / decimals;
+        return balanceUSD;
     }
 
     function getDebtAssetBalance()public view returns(uint balanceUSD){
