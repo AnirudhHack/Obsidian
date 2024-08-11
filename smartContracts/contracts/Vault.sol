@@ -27,7 +27,7 @@ contract WSTETHVault is FlashLoanSimpleReceiverBase, ERC20, IERC4626, Reentrancy
     event PendingGovernance(address indexed governance);
     event GovernanceAccepted(address indexed newGovernance);
 
-    struct RebalanceInput{
+    struct ActionInput{
         uint supplyAmount;
         uint flAmount;
         uint flAmountWithFee;
@@ -35,7 +35,9 @@ contract WSTETHVault is FlashLoanSimpleReceiverBase, ERC20, IERC4626, Reentrancy
     }
 
     enum VauitAction{
-        Rebalance
+        Rebalance,
+        Leverage,
+        Deleverage
     }
 
     /**
@@ -152,6 +154,48 @@ contract WSTETHVault is FlashLoanSimpleReceiverBase, ERC20, IERC4626, Reentrancy
         aave.borrow(address(WETH9), flAmountWithFee, 2, 0, address(this));
     }
 
+    function leverage(uint supplyAmount, uint flAmount, uint flAmountWithFee, uint slippagePercent)private {
+        AaveInterface aave = AaveInterface(aaveProvider.getPool());
+
+        uint slippageAmt = calculateSlippageAmount(supplyAmount, slippagePercent);
+
+        uint returnAmount = uniswapV3Swap(SellInfo(
+            address(WETH9),
+            asset,
+            fee,
+            slippageAmt,
+            flAmount
+        ));
+
+        supplyAmount += returnAmount;
+        // call supply
+        ERC20(asset).approve(address(aave), supplyAmount);
+        aave.supply(asset, supplyAmount, address(this), 0);
+
+        aave.borrow(address(WETH9), flAmountWithFee, 2, 0, address(this));
+    }
+
+    function deleverage(uint withdrawAmount, uint flAmount, uint flAmountWithFee, uint slippagePercent)private {
+        AaveInterface aave = AaveInterface(aaveProvider.getPool());
+        // call aave repay
+        WETH9.approve(address(aave), flAmount);
+        aave.repay(address(WETH9), flAmount, 2, address(this));
+        
+        // withdraw wstEth from aave
+        uint withdrewAmountAave = aave.withdraw(asset, withdrawAmount, address(this));
+
+        uint slippageAmt = calculateSlippageAmount(withdrewAmountAave, slippagePercent);
+
+        uniswapV3Swap(SellInfo(
+            asset,
+            address(WETH9),
+            fee,
+            slippageAmt,
+            withdrewAmountAave
+        ));
+
+    }
+
     function executeOperation(
         address assetaddr,
         uint256 amount,
@@ -159,148 +203,38 @@ contract WSTETHVault is FlashLoanSimpleReceiverBase, ERC20, IERC4626, Reentrancy
         address initiator,
         bytes calldata params
     ) external override returns (bool) {
-        // require(msg.sender == address(LENDING_POOL), "only lending pool");
-        // require(address(this) == initiator, "Untrusted loan initiator");
-        // AaveInterface aave = AaveInterface(aaveProvider.getPool());
-
-        // // abi.decode(params) to decode params
-        // (uint8 operation, bytes memory data, address receiver, ,) = abi.decode(params, (uint8, bytes, address, uint, uint));
-        // uint24 fee = 3000;
-        // uint slippageAmt = 10;
-        // // deposit and reinvestIdleWeth logic
-        // if(operation == 0 || operation == 4){
-        //     uint supplyAmount;
-        //     if(vaultsLeverage == Leverage.Three) supplyAmount = amounts[0] + (amounts[0]/2);
-        //     else supplyAmount = amounts[0] + amounts[0];
-            
-        //     uint returnAmount = uniswapV3Swap(SellInfo(
-        //         address(WETH9),
-        //         asset,
-        //         fee,
-        //         slippageAmt,
-        //         supplyAmount
-        //     ));
-
-        //     // calculating assets in steth on which share to be calculated and minted (only for operation 1 (deposit))
-        //     if(operation == 0){
-        //         uint inputUserAssets;
-        //         if(vaultsLeverage == Leverage.Three) inputUserAssets = returnAmount / 3;
-        //         else inputUserAssets = returnAmount / 2;
-                
-        //         uint shares;
-        //         require((shares = previewDeposit(inputUserAssets)) != 0, "ZERO_SHARES");
-        //         usersShareToBeMinted[receiver] = shares;
-        //     }
-
-        //     // call supply
-        //     ERC20(asset).approve(address(aave), returnAmount);
-        //     aave.supply(asset, returnAmount, address(this), 0);
-
-        //     aave.borrow(address(WETH9), amounts[0], 2, 0, address(this));
-        // }
-        // //withdraw
-        // else if(operation == 1){
-        //     ( , , , ,uint withdrawAmount) = abi.decode(params, (uint8, bytes, address, uint, uint));
-
-        //     // repay Weth on aave
-        //     WETH9.approve(address(aave), amounts[0]);
-        //     aave.repay(address(WETH9), amounts[0], 2, address(this));
-
-        //     // withdraw stEth from aave
-        //     aave.withdraw(asset, withdrawAmount, address(this));
-
-        //     // swap 
-        //     uint returnAmount = uniswapV3Swap(SellInfo(
-        //         asset,
-        //         address(WETH9),
-        //         fee,
-        //         slippageAmt,
-        //         withdrawAmount
-        //     ));
-        //     uint userReceivable = returnAmount - (amounts[0] + premiums[0]);
-        //     WETH9.withdraw(userReceivable);
-        //     payable(receiver).transfer(userReceivable);
-        // }
-        // // Deleverage to 2x
-        // else if(operation == 2){
-        //     ( , , , uint swapAmount,) = abi.decode(params, (uint8, bytes, address, uint, uint));
-
-        //     // repay Weth on aave
-        //     WETH9.approve(address(aave), amounts[0]);
-        //     aave.repay(address(WETH9), amounts[0], 2, address(this));
-
-        //     // withdraw stEth from aave
-        //     aave.withdraw(asset, swapAmount, address(this));
-
-        //     // swap steth to Weth
-        //     uniswapV3Swap(SellInfo(
-        //         asset,
-        //         address(WETH9),
-        //         fee,
-        //         slippageAmt,
-        //         swapAmount
-        //     ));
-        // }
-        // // leverage 2x to 3x
-        // else if(operation == 3){
-        //     // swap Weth to supplyToken
-        //     uint returnAmount = uniswapV3Swap(SellInfo(
-        //         address(WETH9),
-        //         asset,
-        //         fee,
-        //         slippageAmt,
-        //         amounts[0]
-        //     ));
-
-        //     ERC20(asset).approve(address(aave), returnAmount);
-        //     aave.supply(asset, returnAmount, address(this), 0);
-
-        //     aave.borrow(address(WETH9), amounts[0] + premiums[0], 2, 0, address(this));
-        // }
+        require(address(this) == initiator, "Untrusted loan initiator");
+        AaveInterface aave = AaveInterface(aaveProvider.getPool());
+        require(msg.sender == address(aave), "only pool");
 
         uint amountOwing = amount + premium;
         (VauitAction _action, bytes memory _actionParam) = abi.decode(params, (VauitAction, bytes));
-        RebalanceInput memory _rebalance = abi.decode(_actionParam, (RebalanceInput));
-        _rebalance.flAmountWithFee = amountOwing;
-        
-        rebalance(_rebalance.supplyAmount, _rebalance.flAmount, _rebalance.flAmountWithFee, _rebalance.slippagePercent);
+        ActionInput memory _actionInput = abi.decode(_actionParam, (ActionInput));
+        _actionInput.flAmountWithFee = amountOwing;
 
-        IERC20(assetaddr).approve(aaveProvider.getPool(), amountOwing);
+        if(_action == VauitAction.Rebalance){  
+            rebalance(_actionInput.supplyAmount, _actionInput.flAmount, _actionInput.flAmountWithFee, _actionInput.slippagePercent);
+        } else if (_action == VauitAction.Leverage){
+            leverage(_actionInput.supplyAmount, _actionInput.flAmount, _actionInput.flAmountWithFee, _actionInput.slippagePercent);
+        } else if(_action == VauitAction.Deleverage){
+            deleverage(_actionInput.supplyAmount, _actionInput.flAmount, _actionInput.flAmountWithFee, _actionInput.slippagePercent);
+        }
+
+        IERC20(assetaddr).approve(address(aave), amountOwing);
         
         // repay Aave
         return true;
     }
 
     // /**
-	//  * @dev callFlashLoan
-	//  * @notice callFlashLoan function triggers aave flashloan in order to perform any opration like open position, Close position, deleverage, leverage.
+	//  * @dev callVaultAction
+	//  * @notice callVaultAction function triggers aave flashloan in order to perform any opration like open position, Close position, deleverage, leverage.
 	//  * @param operation operation from enum operation
 	//  * @param amount amount
 	//  * @param _data1 data require for swap (dev : data is received from 1inch api by calling it offchain).
 	//  * @param _receiver receiver
 	//  */
-    function callFlashloan(address assetAddr, uint flashLoanAmount, bytes calldata param)public {
-        // uint supplyAmount;
-        // if(operation == 1){
-        //     // withdraw as per current leverage
-        //     (supplyAmount, amount) = convertToSupply(amount);
-        // }
-        // address[] memory assets = new address[](1);
-        // assets[0] = address(WETH9);
-
-        // uint[] memory amounts = new uint[](1);
-        // amounts[0] = amount;
-
-        // // 0 = no debt, 1 = stable, 2 = variable
-        // // 0 = pay all loaned
-        // uint[] memory modes = new uint[](1);
-        // modes[0] = 0;
-        
-        // (, SwapDescription memory desc,) = abi.decode(_data1[4:], (address, SwapDescription, bytes)); 
-
-        // bytes memory params = abi.encode(operation, _data1, _receiver, desc.amount, supplyAmount); // extra data to pass abi.encode(...)
-        // // uint16 referralCode = 0;
-
+    function callVaultAction(address assetAddr, uint flashLoanAmount, bytes calldata param)external onlyGovernance{
 
         AaveInterface(aaveProvider.getPool()).flashLoanSimple(
             address(this),
@@ -326,59 +260,6 @@ contract WSTETHVault is FlashLoanSimpleReceiverBase, ERC20, IERC4626, Reentrancy
         
         return slippageAmount;
     }
-
-    // /**
-	//  * @dev deleverage
-	//  * @notice Deleverage function can only be called by governance and it is used to deleverage the vault.
-	//  * @param amount  amount of borrwed Weth need to repay to deleverage the vault (this is given by function getborrowedAmountForDeleverage() )
-	//  * @param _data1 data require for swap (dev : data is received from 1inch api by calling it offchain).
-	//  */
-    // function deleverage(uint amount, bytes calldata _data1) external nonReentrant onlyGovernance{
-    //     require(vaultsLeverage != Leverage.One, "can't go below 1x");
-        
-    //     triggerFlashLoan(uint8(Operation.Deleverage), amount, _data1, msg.sender);
-    //     if(vaultsLeverage == Leverage.Three) vaultsLeverage = Leverage.Two;
-    //     else vaultsLeverage = Leverage.One;
-    // }
-
-    // /**
-	//  * @dev leverage
-	//  * @notice leverage function can only be called by governance and it is used to leverage the vault.
-	//  * @param amount amount of Weth need to borrow to leverage the vault  (this is given by function getVaultsActualBalance() )
-	//  * @param _data1 data require for swap (dev : data is received from 1inch api by calling it offchain).
-	//  */
-    // function leverage(uint amount, bytes calldata _data1) external nonReentrant onlyGovernance{
-    //     require(vaultsLeverage != Leverage.Three, "can't go above 3x");
-        
-    //     triggerFlashLoan(uint8(Operation.Leverage), amount, _data1, msg.sender);
-    //     if(vaultsLeverage == Leverage.Two) vaultsLeverage = Leverage.Three;
-    //     else vaultsLeverage = Leverage.Two;
-    // }
-
-    // function _open1xLeverage(uint amount, bytes calldata data, address receiver)private {
-        
-    //     WETH9.approve(AGGREGATION_ROUTER_V5, amount);
-    //     uint returnAmount = swap(data);
-
-    //     uint shares;
-    //     require((shares = previewDeposit(returnAmount)) != 0, "ZERO_SHARES");
-    //     usersShareToBeMinted[receiver] = shares;
-
-    //     AaveInterface aave = AaveInterface(aaveProvider.getPool());
-    //     ERC20(asset).approve(address(aave), returnAmount);
-    //     aave.supply(asset, address(this), returnAmount);
-    // }
-
-    // function _close1xLeverage(uint amount, bytes calldata data, address _receiver) private{
-    //     // withdraw stEth from morpho
-    //     morpho.withdraw(pollToken, amount);
-
-    //     // swap stEth to Weth
-    //     ERC20(asset).approve(AGGREGATION_ROUTER_V5, amount);
-    //     uint returnAmount = swap(data);
-    //     WETH9.withdraw(returnAmount);
-    //     payable(_receiver).transfer(returnAmount);
-    // }
 
     
     function totalAssets() public view override returns (uint256){

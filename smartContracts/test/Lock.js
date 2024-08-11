@@ -128,7 +128,7 @@ describe("WSTETHVault", function () {
       const encodedParams = abiCoder.encode(paramTypes, [0, encodedActionParams]);
     
 
-      const tx1 = await vault.connect(accounts[0]).callFlashloan(weth, flAmount, encodedParams, {gasLimit: 10000000});
+      const tx1 = await vault.connect(accounts[0]).callVaultAction(weth, flAmount, encodedParams, {gasLimit: 10000000});
       await tx1.wait();
       
       const sharesAfter = await vault.balanceOf(user);

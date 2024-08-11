@@ -2,14 +2,12 @@ import React from 'react';
 // import { useConnectWallet, useSetChain } from '@web3-onboard/react';
 import {ethers} from 'ethers'
 
-
-
 const ConnectWallet = () => {
   const Base = {
     chainId: 8453,
     name: 'Base',
     currency: 'ETH',
-    rpcUrl: "https://virtual.base.rpc.tenderly.co/${KEY}"
+    rpcUrl: process.env.NEXT_PUBLIC_TENDERLY_BASE_VIRTUAL_TESTNET
   };
     const [connected, setConnected] = React.useState(false);
 

@@ -6,12 +6,147 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {Nav} from "@/components/component/nav";
 import { useSearchParams } from 'next/navigation'
+import {deposit, withdraw, wethAllowance, wethbalance, approveWeth, getTvlOfWstheth} from "../../web3Functions/erc4626Vault"
+import {getConnectedWalletAddress} from "../../web3Functions/wallet"
+import React from "react";
+import {ethers} from "ethers"
+import { baseAddress } from "@/constants/address/baseAddress";
+import numeral from 'numeral'
+
+const strategyToAddress = {
+  1: baseAddress.wstETHVault
+}
 
 export default function Game() {
   const searchParams = useSearchParams()
- 
   const strategy = searchParams.get('strategy')
-  console.log(strategy)
+
+  const [amount, setAmount] = React.useState('');
+  const [wethAllow, setWethAllowance] = React.useState("0");
+  const [wethBal, setWethBal] = React.useState("0");
+  const [tvl, setTVL] = React.useState("0");
+  // Function to handle input changes
+  const handleInputChange = (event) => {
+    setAmount(event.target.value);
+  };
+  
+  const [walletAddress, setWalletAddress] = React.useState(null);
+
+  React.useEffect(() => {
+    // Call the function to get the connected wallet address
+    getConnectedWalletAddress().then((address) => {
+      // Set the wallet address in the state
+      setWalletAddress(address);
+    });
+  }, [window.ethereum]);
+  
+  const handleDeposit = async () => {
+    try {
+      console.log("amount ", amount)
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+
+      const success = await deposit(signer, amount);
+      if (success) {
+        alert('deposited sucessfully');
+      } else {
+        alert('Failed to deposit');
+      }
+    } catch (error) {
+      console.error('Error deposit:', error);
+      alert('Failed to deposit. Please try again.');
+    }
+  };
+
+  const handleWithdraw = async () => {
+    try {
+      console.log("amount ", amount)
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+
+      const success = await withdraw(signer, amount);
+      if (success) {
+        alert('deposited sucessfully');
+      } else {
+        alert('Failed to withdraw');
+      }
+    } catch (error) {
+      console.error('Error withdraw:', error);
+      alert('Failed to withdraw. Please try again.');
+    }
+  };
+
+  const handleApprove = async () => {
+    try {
+      console.log("amount ", amount)
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        const signer = provider.getSigner();
+        console.log(strategyToAddress[strategy], " strategyToAddress[strategy]")
+      const success = await approveWeth(signer, strategyToAddress[strategy], amount);
+      if (success) {
+        alert('approved sucessfully');
+      } else {
+        alert('Failed to approve');
+      }
+    } catch (error) {
+      console.error('Error approve:', error);
+      alert('Failed to approve. Please try again.');
+    }
+  };
+
+  React.useEffect(() => {
+    const checkWethAllowance = async () => {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const address = await signer.getAddress();
+      const val = await wethAllowance(provider, address, strategyToAddress[strategy])
+      console.log("allowa ", val, walletAddress )
+      setWethAllowance(val)
+    }
+  
+    checkWethAllowance(); // Initial check
+  
+    const intervalId = setInterval(checkWethAllowance, 3000); // Call checkWethAllowance every 3 seconds
+  
+    return () => clearInterval(intervalId); // Cleanup function to clear the interval
+  }, []);
+
+  React.useEffect(() => {
+    const checkWethBal = async () => {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const address = await signer.getAddress();
+      const val = await wethbalance(provider, address)
+
+      setWethBal(val)
+    }
+  
+    checkWethBal(); // Initial check
+  
+    const intervalId = setInterval(checkWethBal, 3000); // Call checkWethBal every 3 seconds
+  
+    return () => clearInterval(intervalId); // Cleanup function to clear the interval
+  }, []);
+
+  React.useEffect(() => {
+    const getTVL = async () => {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const signer = await provider.getSigner();
+      
+      const address = await signer.getAddress();
+      const val = await getTvlOfWstheth(provider)
+      console.log("TVL ", val )
+      setTVL(val)
+    }
+  
+    getTVL(); // Initial check
+  
+    const intervalId = setInterval(getTVL, 3000); // Call getTVL every 3 seconds
+  
+    return () => clearInterval(intervalId); // Cleanup function to clear the interval
+  }, []);
 
   return (
       (<div className="flex flex-col min-h-[100dvh] bg-background">
@@ -42,7 +177,7 @@ export default function Game() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-muted-foreground">Total Value Locked (TVL)</p>
-                            <p className="text-2xl font-bold">$2.3M</p>
+                            <p className="text-2xl font-bold">${numeral(parseFloat(tvl)).format('0.0a')}</p>
                           </div>
                           <div className="text-sm text-primary font-bold">6.2% APY</div>
                         </div>
@@ -52,9 +187,17 @@ export default function Game() {
                             <p className="text-2xl font-bold">0.5 WBTC</p>
                           </div>
                           <div className="flex gap-2">
-                            <Input type="number" placeholder="Amount" />
-                            <Button variant="outline">Deposit</Button>
-                            <Button variant="outline">Withdraw</Button>
+                            <Input type="number" placeholder="Amount" 
+                              value={amount} 
+                              onChange={handleInputChange}
+                            />
+                            {
+                              amount && parseFloat(amount) <= parseFloat(wethAllow) ?
+                                <Button variant="outline" onClick={handleDeposit}>Deposit</Button>
+                              :
+                                <Button variant="outline" onClick={handleApprove}>Approve</Button>
+                            }
+                            <Button variant="outline" onClick={handleWithdraw}>Withdraw</Button>
                           </div>
                         </div>
                       </div>
