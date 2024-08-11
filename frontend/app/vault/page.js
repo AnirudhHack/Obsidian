@@ -5,10 +5,10 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import {Nav} from "@/components/component/nav";
-import { useSearchParams } from 'next/navigation'
+// import { useSearchParams } from 'next/navigation'
 import {deposit, withdraw, wethAllowance, wethbalance, approveWeth, getTvlOfWstheth} from "../../web3Functions/erc4626Vault"
 import {getConnectedWalletAddress} from "../../web3Functions/wallet"
-import React from "react";
+import React, { Suspense } from "react";
 import {ethers} from "ethers"
 import { baseAddress } from "@/constants/address/baseAddress";
 import numeral from 'numeral'
@@ -18,8 +18,8 @@ const strategyToAddress = {
 }
 
 export default function Game() {
-  const searchParams = useSearchParams()
-  const strategy = searchParams.get('strategy')
+  // const searchParams = useSearchParams()
+  const strategy = 1//searchParams.get('strategy')
 
   const [amount, setAmount] = React.useState('');
   const [wethAllow, setWethAllowance] = React.useState("0");
@@ -207,7 +207,7 @@ export default function Game() {
                     <h3 className="text-xl font-bold">Vault Strategy</h3>
                     <p className="text-muted-foreground">
                       The WBTC Vault employs a yield farming strategy that leverages various DeFi protocols to generate
-                      competitive returns for depositors. The vault's smart contracts automatically manage the deployment of
+                      competitive returns for depositors. The vault&apos;s smart contracts automatically manage the deployment of
                       funds, optimizing for yield while maintaining a high level of security and liquidity.
                     </p>
                   </div>
