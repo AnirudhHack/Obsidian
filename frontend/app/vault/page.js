@@ -8,7 +8,7 @@ import {Nav} from "@/components/component/nav";
 // import { useSearchParams } from 'next/navigation'
 import {deposit, withdraw, wethAllowance, wethbalance, approveWeth, getTvlOfWstheth} from "../../web3Functions/erc4626Vault"
 import {getConnectedWalletAddress} from "../../web3Functions/wallet"
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import {ethers} from "ethers"
 import { baseAddress } from "@/constants/address/baseAddress";
 import numeral from 'numeral'
@@ -18,13 +18,22 @@ const strategyToAddress = {
 }
 
 export default function Game() {
-  // const searchParams = useSearchParams()
-  const strategy = 1//searchParams.get('strategy')
+  const [strategy, setStrategy] = React.useState('');
+
+  function HandleParam(){
+    setStrategy(1)
+  }
+
+  // useEffect(() => {
+  //   const params = new URLSearchParams(window.location.search);
+  //   setStrategy(params.get('strategy'));
+  // }, []);
 
   const [amount, setAmount] = React.useState('');
   const [wethAllow, setWethAllowance] = React.useState("0");
   const [wethBal, setWethBal] = React.useState("0");
   const [tvl, setTVL] = React.useState("0");
+  // const [strategy, setStrategy] = React.useState(null);
   // Function to handle input changes
   const handleInputChange = (event) => {
     setAmount(event.target.value);
@@ -81,8 +90,8 @@ export default function Game() {
       console.log("amount ", amount)
         const provider = new ethers.providers.Web3Provider(window.ethereum);
         const signer = provider.getSigner();
-        console.log(strategyToAddress[strategy], " strategyToAddress[strategy]")
-      const success = await approveWeth(signer, strategyToAddress[strategy], amount);
+        console.log(strategyToAddress[1], " strategyToAddress[strategy]")
+      const success = await approveWeth(signer, strategyToAddress[1], amount);
       if (success) {
         alert('approved sucessfully');
       } else {
@@ -100,8 +109,9 @@ export default function Game() {
       const signer = await provider.getSigner();
       
       const address = await signer.getAddress();
-      const val = await wethAllowance(provider, address, strategyToAddress[strategy])
-      console.log("allowa ", val, walletAddress )
+      console.log(":address, strategyToAddress[strategy]", address, strategyToAddress[1])
+      const val = await wethAllowance(provider, address, strategyToAddress[1])
+      console.log("allowa ", val )
       setWethAllowance(val)
     }
   
@@ -157,7 +167,7 @@ export default function Game() {
               <section className="flex justify-center w-full  bg-muted">
                 <div className=" w-full flex flex-col items-center">
                   <img
-                    src="/placeholder.svg"
+                    src="/wstETH.png"
                     width="1200"
                     height="300"
                     alt="WBTC Vault"
@@ -167,9 +177,9 @@ export default function Game() {
                 <div className="container px-4 md:px-6">
                   <Card>
                     <CardHeader>
-                      <CardTitle>WBTC Vault</CardTitle>
+                      <CardTitle>wstETH Vault</CardTitle>
                       <CardDescription>
-                        Earn <span className="text-primary font-bold">6.2% APY</span>
+                        Earn <span className="text-primary font-bold">13% APY</span>
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -179,12 +189,12 @@ export default function Game() {
                             <p className="text-muted-foreground">Total Value Locked (TVL)</p>
                             <p className="text-2xl font-bold">${numeral(parseFloat(tvl)).format('0.0a')}</p>
                           </div>
-                          <div className="text-sm text-primary font-bold">6.2% APY</div>
+                          <div className="text-sm text-primary font-bold">13% APY</div>
                         </div>
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-muted-foreground">Your Balance</p>
-                            <p className="text-2xl font-bold">0.5 WBTC</p>
+                            <p className="text-2xl font-bold">{parseFloat(wethBal).toFixed(2)} WETH</p>
                           </div>
                           <div className="flex gap-2">
                             <Input type="number" placeholder="Amount" 
@@ -206,9 +216,9 @@ export default function Game() {
                   <div className="mt-8 flex flex-col gap-4">
                     <h3 className="text-xl font-bold">Vault Strategy</h3>
                     <p className="text-muted-foreground">
-                      The WBTC Vault employs a yield farming strategy that leverages various DeFi protocols to generate
-                      competitive returns for depositors. The vault&apos;s smart contracts automatically manage the deployment of
-                      funds, optimizing for yield while maintaining a high level of security and liquidity.
+                      Convert WETH to Lido&apos;s wstETH and leverage more wstETH by borrowing WETH in order to increase yield received from staking rewards.
+                      <br /><br />
+                      While this strategy can increase rewards received through staking, it also has multiple variables and risks you should consider: First, the WETH borrow APY in Aave v3 is variable and may not always be lower than staking rewards received. Second, the value of wstETH versus ETH is also variable and drops in the wstETH/ETH price ratio can make your position risky or cause losses at the moment of exiting the position. Third, please note that the risk of liquidation exists for this type of position and you can find the wstETH/ETH liquidation rate for your position in the top right corner of our Aave dashboard.
                     </p>
                   </div>
                 </div>
@@ -231,56 +241,34 @@ export default function Game() {
               </div>
               <div
                 className="mx-auto grid max-w-5xl items-start gap-6 py-12 lg:grid-cols-2 lg:gap-12">
-                <Link href="/vault?strategy=1" prefetch={false}>
+                <button
+                // href="/vault?strategy=1" 
+                  prefetch={false} onClick={HandleParam}>
                   <Card>
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
                           <CardTitle>wstETH Vault</CardTitle>
-                          <CardDescription>Earn 6.2% APY</CardDescription>
+                          <CardDescription>Earn 13% APY</CardDescription>
                         </div>
-                        <div className="text-sm text-muted-foreground">$2.3M TVL</div>
+                        <div className="text-sm text-muted-foreground">${numeral(parseFloat(tvl)).format('0.0a')} TVL</div>
                       </div>
                     </CardHeader>
                     <CardContent>
                       <div className="flex items-center justify-between">
                         <div>
                           <p className="text-muted-foreground">Your Balance</p>
-                          <p className="text-2xl font-bold">0.5 WBTC</p>
+                          <p className="text-2xl font-bold">{parseFloat(wethBal).toFixed(2)} WETH</p>
                         </div>
                         <div className="flex gap-2">
-                          <Button variant="outline">Deposit</Button>
-                          <Button variant="outline">Withdraw</Button>
+                          <Button variant="outline">ERC4626</Button>
+                          <Button variant="outline">wstETH</Button>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
-                </Link>
-                <Link href="#" prefetch={false}>
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle>ETH Vault</CardTitle>
-                          <CardDescription>Earn 5.8% APY</CardDescription>
-                        </div>
-                        <div className="text-sm text-muted-foreground">$5.1M TVL</div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-muted-foreground">Your Balance</p>
-                          <p className="text-2xl font-bold">2.1 ETH</p>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button variant="outline">Deposit</Button>
-                          <Button variant="outline">Withdraw</Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                  </button>
+                
               </div>
             </div>
           </section>)

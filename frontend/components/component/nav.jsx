@@ -14,23 +14,13 @@ export function Nav() {
         </Link>
         <nav className="ml-auto flex gap-4 sm:gap-6">
           <Link
-            href="#"
+            style={{marginRight: "8px"}}
+            href="https://github.com/AnirudhHack/Obsidian.git"
             className="text-sm font-medium hover:underline underline-offset-4"
             prefetch={false}>
-            Vaults
+            Doc
           </Link>
-          <Link
-            href="#"
-            className="text-sm font-medium hover:underline underline-offset-4"
-            prefetch={false}>
-            Dashboard
-          </Link>
-          {/* <Link
-            href="#"
-            className="text-sm font-medium hover:underline underline-offset-4"
-            prefetch={false}>
-            FAQ
-          </Link> */}
+
         </nav>
           <div>
             <ConnectWallet/>

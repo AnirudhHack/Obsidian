@@ -70,7 +70,7 @@ const ConnectWallet = () => {
 
             <button className={`connect-button ${connected ? 'connected' : ''}`} onClick={connectWallet}
                 style={{ 
-                    backgroundColor: '#4CAF50',
+                    backgroundColor: 'violet',
                     border: 'none',
                     color: 'white',
                     padding: '10px 24px',
@@ -84,7 +84,7 @@ const ConnectWallet = () => {
                     transition: 'background-color 0.3s'
                 }}
             >
-                {connected ? 'Connected' : 'Connect Wallet'}
+                {connected ? 'Connected to Tenderly Base' : 'Connect Wallet'}
             </button>
     )
 
